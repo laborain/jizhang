@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家庭记账 · 呆头鹅 &amp; 扣扣（云端同步版）</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{--bg:#f4f6fb;--card:#fff;--line:#e6eaf2;--text:#1f2937;--sub:#8a94a6;--a:#4f6ef7;--a-soft:#e8ecff;--b:#ff8a5c;--b-soft:#fff0e8;--ok:#22b07d;--danger:#ef4444;--shadow:0 6px 24px rgba(30,50,90,.08)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);padding:16px 12px 60px}
+  .wrap{max-width:1160px;margin:0 auto}
+  header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .brand{display:flex;align-items:center;gap:11px}
+  .logo{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#4f6ef7,#7c4dff);display:grid;place-items:center;color:#fff;font-size:20px;box-shadow:var(--shadow)}
+  .brand h1{font-size:18px}
+  .brand p{font-size:11px;color:var(--sub);margin-top:2px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:12px;font-weight:600}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block}.dot.a{background:var(--a)}.dot.b{background:var(--b)}
+  .sync{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;padding:6px 11px;border-radius:999px;background:#e7f9f1;color:var(--ok)}
+  .sync.warn{background:#fff4e5;color:#d98324}.sync.err{background:#fdeaea;color:var(--danger)}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.8)}}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .stat{background:var(--card);border-radius:16px;padding:15px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .stat .lbl{font-size:11px;color:var(--sub);font-weight:600}
+  .stat .val{font-size:24px;font-weight:800;margin-top:5px;font-variant-numeric:tabular-nums}
+  .stat .val small{font-size:12px;color:var(--sub);font-weight:600}
+  .stat::after{content:"";position:absolute;right:-16px;top:-16px;width:64px;height:64px;border-radius:50%;opacity:.14}
+  .stat:nth-child(1)::after{background:#4f6ef7}.stat:nth-child(2)::after{background:#ff8a5c}.stat:nth-child(3)::after{background:#22b07d}.stat:nth-child(4)::after{background:#7c4dff}
+  .grid{display:grid;grid-template-columns:minmax(300px,370px) 1fr;gap:14px;align-items:start}
+  .card{background:var(--card);border-radius:18px;padding:17px;box-shadow:var(--shadow)}
+  .card h2{font-size:15px;margin-bottom:11px;display:flex;align-items:center;gap:7px}
+  .tag{font-size:11px;font-weight:600;color:var(--sub);background:#f0f3f9;padding:3px 8px;border-radius:6px}
+  form{display:flex;flex-direction:column;gap:10px}
+  .row{display:flex;gap:9px}.row>*{flex:1}
+  label{font-size:12px;color:var(--sub);display:block;margin-bottom:4px;font-weight:600}
+  input,select,textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:11px;font-size:14px;font-family:inherit;background:#fbfcfe;transition:.15s;color:var(--text)}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--a);background:#fff;box-shadow:0 0 0 3px var(--a-soft)}
+  textarea{resize:vertical;min-height:42px}
+  .radio{display:flex;gap:7px}
+  .radio label{flex:1;margin:0;text-align:center;padding:10px;border:1px solid var(--line);border-radius:11px;cursor:pointer;font-weight:600;font-size:13px;background:#fbfcfe;transition:.15s}
+  .radio input{display:none}
+  .radio label:has(input:checked){border-color:transparent;color:#fff}
+  .radio.a label:has(input:checked){background:var(--a)}.radio.b label:has(input:checked){background:var(--b)}
+  .chk{display:flex;align-items:center;gap:9px;padding:10px 11px;border:1px solid var(--line);border-radius:11px;cursor:pointer;font-size:13px;font-weight:600;background:#fbfcfe}
+  .chk input{width:auto;accent-color:var(--a);width:16px;height:16px}
+  .months{display:none;margin-top:7px;gap:9px}.months.show{display:flex}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:11px;font-size:14px;font-weight:700;padding:11px 15px;transition:.15s}
+  .btn-primary{background:linear-gradient(135deg,#4f6ef7,#7c4dff);color:#fff;box-shadow:0 6px 16px rgba(79,110,247,.3)}
+  .btn-primary:hover{transform:translateY(-1px)}.btn-primary:disabled{opacity:.6;cursor:not-allowed;transform:none}
+  .btn-ghost{background:#f0f3f9;color:var(--text)}.btn-ghost:hover{background:#e4e9f3}
+  .btn-sm{padding:7px 11px;font-size:12px;border-radius:8px}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:11px}
+  .toolbar .spacer{flex:1}
+  .tabs{display:flex;gap:5px;background:#eef1f7;padding:4px;border-radius:12px;margin-bottom:12px}
+  .tabs button{background:transparent;color:var(--sub);padding:8px 13px;font-size:13px}
+  .tabs button.on{background:#fff;color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .chart-box{position:relative;height:250px}
+  .cat-list{display:flex;flex-direction:column;gap:7px;max-height:340px;overflow:auto}
+  .cat-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--line);border-radius:11px;background:#fbfcfe}
+  .cat-item .sw{width:13px;height:13px;border-radius:4px;flex-shrink:0}
+  .cat-item input[type=text]{border:none;background:transparent;padding:5px 3px;font-size:13px;font-weight:600;flex:1}
+  .cat-item input[type=text]:focus{background:#fff}
+  .cat-item .del{margin-left:auto;color:var(--danger);background:transparent;padding:3px 7px;font-size:13px}
+  .cat-item .del:disabled{color:#ccd2dd;cursor:not-allowed}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 7px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{font-size:11px;color:var(--sub);font-weight:700;white-space:nowrap;cursor:pointer;user-select:none}
+  th:hover{color:var(--a)}
+  tbody tr:hover{background:#fafbff}
+  .who-badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+  .who-badge.a{background:var(--a-soft);color:var(--a)}.who-badge.b{background:var(--b-soft);color:var(--b)}
+  .amt{font-weight:800;font-variant-numeric:tabular-nums}
+  .cat-pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 8px;border-radius:7px;background:#f0f3f9}
+  .amort-tag{font-size:10px;color:#7c4dff;background:#f0eaff;padding:2px 6px;border-radius:5px;margin-left:4px;font-weight:700}
+  .del-row{color:var(--danger);background:transparent;padding:3px 7px;font-size:13px}
+  .empty{text-align:center;color:var(--sub);padding:30px 10px;font-size:13px}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#1f2937;color:#fff;padding:11px 19px;border-radius:12px;font-size:13px;opacity:0;transition:.25s;z-index:99;box-shadow:0 10px 30px rgba(0,0,0,.2);max-width:90vw;text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .modal{position:fixed;inset:0;background:rgba(20,30,55,.45);display:none;place-items:center;z-index:60;padding:14px}
+  .modal.show{display:grid}
+  .modal .card{max-width:440px;width:100%;max-height:90vh;overflow:auto}
+  .steps{font-size:13px;line-height:1.9;color:var(--text)}
+  .steps b{color:var(--a)}
+  .steps .code{display:block;background:#0f172a;color:#e2e8f0;padding:9px 11px;border-radius:8px;font-family:monospace;font-size:12px;margin:5px 0 9px;word-break:break-all}
+  .hint{font-size:12px;color:var(--sub);line-height:1.7;background:#f8fafd;border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin-top:7px}
+  .kv{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px dashed var(--line)}
+  .kv:last-child{border:none}
+  .banner{background:linear-gradient(135deg,#e8ecff,#f0eaff);border:1px solid #d8deff;border-radius:14px;padding:13px 15px;font-size:13px;line-height:1.7;margin-bottom:14px}
+  .banner b{color:var(--a)}
+  .status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px}
+  @media(max-width:880px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}body{padding-bottom:40px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="logo">💰</div>
+      <div>
+        <h1>家庭记账 · 呆头鹅 &amp; 扣扣</h1>
+        <p id="todayTxt"></p>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="pill"><span class="dot a"></span>呆头鹅</span>
+      <span class="pill"><span class="dot b"></span>扣扣</span>
+      <span class="sync" id="syncBadge"><span class="pulse"></span><span id="syncTxt">云端同步中</span></span>
+      <button class="btn-ghost btn-sm" id="openSetup">⚙️ 账本设置</button>
+    </div>
+  </header>
+
+  <div class="banner" id="banner">
+    👋 <b>第一次用？三步就能两人共享：</b>① 点右上角「⚙️ 账本设置」→ 按引导建好云端账本（只需做一次）；② 把本网页发给扣扣（微信发文件即可）；③ 两人都打开这个网页，一人记账，另一人几秒内自动看到。<br>
+    没配置前，账单只存在本机浏览器里，<b>不会跨设备同步</b>。
+  </div>
+
+  <section class="stats" id="stats"></section>
+
+  <div class="grid">
+    <!-- 录入 -->
+    <div class="card">
+      <h2>✍️ 记一笔</h2>
+      <form id="form">
+        <div><label>金额（元）</label><input type="number" id="amount" placeholder="如 1200" step="0.01" min="0" required></div>
+        <div class="row">
+          <div><label>类别</label><select id="category"></select></div>
+          <div><label>付款人</label>
+            <div class="radio a">
+              <label><input type="radio" name="who" value="呆头鹅" checked><span>呆头鹅</span></label>
+              <label><input type="radio" name="who" value="扣扣"><span>扣扣</span></label>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div><label>日期</label><input type="date" id="date"></div>
+          <div><label>分摊</label>
+            <div class="radio b">
+              <label><input type="radio" name="split" value="1" checked><span>我全付</span></label>
+              <label><input type="radio" name="split" value="0.5"><span>一人一半</span></label>
+            </div>
+          </div>
+        </div>
+        <div><label>备注</label><textarea id="note" placeholder="如：地下车位 10-11 月"></textarea></div>
+
+        <label class="chk"><input type="checkbox" id="amortize"><span>🔁 多月缴纳（按年/按季/按多月平摊，避免单月统计失真）</span></label>
+        <div class="months" id="monthsBox">
+          <div style="flex:1"><label>平摊覆盖月数</label><input type="number" id="months" value="2" min="2" max="24"></div>
+          <div style="flex:1.6"><label>结束月份（自动算）</label><input type="text" id="endMonth" readonly></div>
+        </div>
+        <div class="hint" id="amortHint"></div>
+
+        <div class="row" style="margin-top:2px">
+          <button type="submit" class="btn-primary" id="submitBtn">＋ 保存这笔账</button>
+          <button type="button" class="btn-ghost btn-sm" id="fillDemo">示例</button>
+        </div>
+      </form>
+      <div class="hint">
+        💡 <b>多月平摊怎么算：</b>10 月交 2 个月车位费 1200 元 → 10 月记 600、11 月自动记 600；1 月交全年物业费 6000 元 → 1~12 月每月 500。勾选后看板开「含平摊」即可，明细带 <b>🔁</b> 标记。删除原账单，后续月份的摊分也会一起消失。
+      </div>
+    </div>
+
+    <!-- 图表 + 明细 -->
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="toolbar">
+          <h2 style="margin:0">📊 数据看板</h2>
+          <select id="range"><option value="thisMonth">本月</option><option value="lastMonth">上月</option><option value="thisQuarter">本季度</option><option value="thisYear">本年</option><option value="all">全部</option></select>
+          <label class="chk" style="margin:0;padding:7px 10px"><input type="checkbox" id="includeAmort" checked><span>含平摊</span></label>
+          <button class="btn-ghost btn-sm" id="exportBtn">⬇ 导出 Excel</button>
+          <button class="btn-ghost btn-sm" id="backupBtn">☁️ 备份 JSON</button>
+        </div>
+        <div class="tabs" id="chartTabs">
+          <button data-t="cat" class="on">按类别</button>
+          <button data-t="who">按人</button>
+          <button data-t="trend">月度趋势</button>
+        </div>
+        <div class="chart-box"><canvas id="chart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar" style="margin-bottom:9px">
+          <h2 style="margin:0">🧾 账单明细</h2>
+          <input type="text" id="search" placeholder="搜索备注/类别" style="max-width:160px">
+          <select id="filterWho"><option value="all">全部成员</option><option>呆头鹅</option><option>扣扣</option></select>
+          <select id="filterCat"><option value="all">全部分类</option></select>
+          <button class="btn-ghost btn-sm" id="refreshBtn">🔄 刷新</button>
+          <button class="btn-ghost btn-sm" id="clearAll">清空</button>
+        </div>
+        <div style="overflow-x:auto"><table id="table"><thead><tr>
+          <th data-k="date">日期</th><th data-k="who">谁付的</th><th data-k="category">类别</th><th data-k="amount">金额</th><th data-k="note">备注</th><th></th>
+        </tr></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 分类管理 -->
+  <div class="card" style="margin-top:14px">
+    <h2>🗂️ 支出分类管理 <span class="tag">可自由编辑</span></h2>
+    <p style="font-size:12px;color:var(--sub);margin-bottom:9px">内置分类可改名、改颜色；自己加的分类可删除。改完立即生效，图表与筛选同步更新。</p>
+    <div class="toolbar">
+      <input type="text" id="newCat" placeholder="新建分类，如：宠物、装修、人情往来" style="max-width:240px">
+      <input type="color" id="newCatColor" value="#4f6ef7" title="选颜色" style="width:44px;height:38px;padding:2px;border-radius:8px">
+      <button class="btn-primary btn-sm" id="addCat">＋ 添加分类</button>
+    </div>
+    <div class="cat-list" id="catList"></div>
+  </div>
+
+  <p style="text-align:center;color:var(--sub);font-size:12px;margin-top:20px;line-height:1.8">
+    🔐 账单存在你自己的 Supabase 项目里，只有知道「账本 ID + 共享密码」的呆头鹅和扣扣能看。<br>
+    建议每月点一次「⬇ 导出 Excel」+「☁️ 备份 JSON」，防止忘记续期导致数据风险。
+  </p>
+</div>
+
+<!-- 账本设置 / 引导弹窗 -->
+<div class="modal" id="setupModal">
+  <div class="card">
+    <h2>⚙️ 账本设置（只需配置一次）</h2>
+    <div id="setupStep"></div>
+    <div class="toolbar" style="margin-top:14px">
+      <button class="btn-ghost btn-sm" id="prevStep" style="display:none">← 上一步</button>
+      <div class="spacer"></div>
+      <button class="btn-ghost" id="cancelSetup">关闭</button>
+      <button class="btn-primary btn-sm" id="nextStep">下一步</button>
+    </div>
+  </div>
+</div>
+
+<!-- 通用确认弹窗 -->
+<div class="modal" id="modal">
+  <div class="card">
+    <h2 id="modalTitle">确认</h2>
+    <p id="modalText" style="font-size:13px;color:var(--sub);line-height:1.7"></p>
+    <div class="toolbar" style="margin-top:14px">
+      <div class="spacer"></div>
+      <button class="btn-ghost" id="modalCancel">取消</button>
+      <button class="btn-primary" id="modalOk">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ 配置：只需要改这里 ============ */
+// 打开 https://supabase.com/dashboard → Project Settings → API，把下面两个值换成你自己的
+const SUPABASE_URL = "https://ngftuetmuxgfyzbsminr.supabase.co";   // 例：https://abcdefg.supabase.co
+const SUPABASE_ANON_KEY = "sb_publishable_wbNRoa54GJRNQMfDBMXFIg_WW0VDvI5";   // 例：eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+/* ========================================= */
+
+const $ = s => document.querySelector(s);
+const LS = 'fj_ledger_cfg_v1';
+let sb = null;            // Supabase 客户端
+let cfg = JSON.parse(localStorage.getItem(LS)||'{}');
+let state = { categories:[], entries:[], members:[] };
+let chart=null, chartType='cat';
+let online = false;
+
+const fmt = n => '¥'+(n||0).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const ym = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+const ymd = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today = new Date();
+$('#todayTxt').textContent = today.getFullYear()+' 年 '+(today.getMonth()+1)+' 月 · 呆头鹅 & 扣扣 的共同账本';
+$('#date').value = ymd(today);
+
+/* ============ 工具：SHA-256 ============ */
+async function sha256(t){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }
+
+/* ============ Supabase 客户端 ============ */
+function ensureClient(){
+  if(sb) return sb;
+  if(!SUPABASE_URL || !SUPABASE_ANON_KEY){ setSync('未配置云端','warn'); return null; }
+  try{
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    return sb;
+  }catch(e){ setSync('连接失败','err'); return null; }
+}
+async function openLedger(){
+  const c = ensureClient(); if(!c) return false;
+  if(!cfg.ledgerId || !cfg.pad){ setSync('未选择账本','warn'); return false; }
+  try{
+    const { error } = await c.rpc('open_ledger', { pad_hash: await sha256(cfg.pad), ledger_id: cfg.ledgerId });
+    return !error;
+  }catch(e){ return false; }
+}
+
+/* ============ 云端 CRUD ============ */
+async function loadFromCloud(){
+  const c = ensureClient(); if(!c) return;
+  if(!await openLedger()){ setSync('账本打不开，检查密码','err'); return; }
+  const since = cfg.since || '1970-01-01';
+  const [{data:entries,error:e1},{data:members},{data:categories}] = await Promise.all([
+    c.from('entry').select('*').gte('occurred_on', since).order('occurred_on',{ascending:false}),
+    c.from('member').select('*').eq('is_active',true),
+    c.from('category').select('*').eq('is_active',true).order('sort')
+  ]);
+  if(e1){ console.error(e1); setSync('读取失败','err'); return; }
+  state.entries = entries||[];
+  state.members = members||[];
+  state.categories = categories&&categories.length? categories : defaultCategories();
+  cfg.since = ymd(today);
+  saveCfg();
+  online = true;
+  setSync('云端同步中');
+  render();
+}
+
+async function pushEntry(payload){
+  const c = ensureClient(); if(!c) throw '未配置云端';
+  const { data, error } = await c.from('entry').insert(payload).select();
+  if(error) throw error?.message||'保存失败';
+  return data[0];
+}
+async function deleteEntry(id){
+  const c = ensureClient(); if(!c) return;
+  await c.from('entry').delete().eq('id', id);
+}
+
+/* ============ 本地兜底（未配置云端时） ============ */
+const LSL = 'fj_local_ledger_v1';
+function local(){
+  let s = JSON.parse(localStorage.getItem(LSL)||'null');
+  if(!s) s = { categories: defaultCategories(), entries:[], members:[] };
+  return s;
+}
+function defaultCategories(){ return [
+  {id:'c1',name:'餐饮',color:'#ff8a5c'},{id:'c2',name:'日用百货',color:'#4f6ef7'},
+  {id:'c3',name:'交通出行',color:'#06b6d4'},{id:'c4',name:'水电燃气',color:'#f59e0b'},
+  {id:'c5',name:'物业费',color:'#84cc16'},{id:'c6',name:'车位费',color:'#a855f7'},
+  {id:'c7',name:'小孩学费',color:'#ec4899'},{id:'c8',name:'房租',color:'#0ea5e9'},
+  {id:'c9',name:'医疗健康',color:'#ef4444'},{id:'c10',name:'娱乐休闲',color:'#7c4dff'},
+  {id:'c11',name:'服饰美容',color:'#14b8a6'},{id:'c12',name:'其他',color:'#8a94a6'}
+]; }
+
+/* ============ 平摊逻辑 ============ */
+function splitPeriods(rec){
+  const n = (rec.months&&rec.months>=2)? rec.months : 1;
+  const start = new Date(rec.occurred_on||rec.date);
+  const per = rec.amount / n;
+  const out=[];
+  for(let i=0;i<n;i++){
+    const d = new Date(start.getFullYear(), start.getMonth()+i, 1);
+    out.push({ period: ym(d), amount: per });
+  }
+  // 修正四舍五入：余差归入首月
+  const sum = out.reduce((s,x)=>s+x.amount,0);
+  out[0].amount = +(out[0].amount + (rec.amount - sum)).toFixed(2);
+  return out;
+}
+
+/* ============ 渲染 ============ */
+function catOf(id){ return state.categories.find(c=>c.id===id) || {name:'其他',color:'#8a94a6'}; }
+
+function refreshCatUI(){
+  const opts = state.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  $('#category').innerHTML = opts;
+  $('#filterCat').innerHTML = '<option value="all">全部分类</option>'+state.categories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  $('#catList').innerHTML = state.categories.map(c=>`
+    <div class="cat-item">
+      <span class="sw" style="background:${c.color}"></span>
+      <input type="text" value="${c.name}" data-id="${c.id}" class="cat-name" ${c.builtin?'':'title="自定义分类，可删除"'}">
+      <input type="color" value="${c.color}" data-id="${c.id}" class="cat-color" title="改颜色" style="width:28px;height:24px;padding:2px;border-radius:6px">
+      <button class="del" data-id="${c.id}" ${c.builtin?'disabled title="内置分类不可删，可改名"':'title="删除"'}>🗑️</button>
+    </div>`).join('');
+}
+
+$('#addCat').onclick = async ()=>{
+  const name=$('#newCat').value.trim();
+  if(!name){ toast('先输入分类名称'); return; }
+  if(state.categories.find(c=>c.name===name)){ toast('分类已存在'); return; }
+  const rec = { ledger_id:cfg.ledgerId||null, name, icon:'🏷️', type:'expense', sort:99, is_active:true, color:$('#newCatColor').value };
+  if(online && sb){
+    const { data, error } = await sb.from('category').insert(rec).select();
+    if(error){ toast('添加失败：'+error.message); return; }
+    state.categories.push(data[0]);
+  }else{
+    rec.id='cc'+Date.now(); rec.builtin=0; state.categories.push(rec);
+    const s=local(); s.categories=state.categories; localStorage.setItem(LSL,JSON.stringify(s));
+  }
+  $('#newCat').value=''; render(); toast('已添加分类 ✅');
+};
+$('#catList').onclick = e=>{
+  if(e.target.classList.contains('del')&&!e.target.disabled){
+    const id=e.target.dataset.id, c=state.categories.find(x=>x.id===id);
+    confirmModal(`删除分类「${c.name}」？`,'该分类下的账单会归入"其他"。',async()=>{
+      if(online&&sb){ await sb.from('category').update({is_active:false}).eq('id',id); }
+      else{ const s=local(); s.categories=state.categories.filter(x=>x.id!==id);
+        s.entries.forEach(r=>{ if(r.category_id===id) r.category_id = state.categories.find(x=>x.name==='其他')?.id; });
+        localStorage.setItem(LSL,JSON.stringify(s)); }
+      state.categories=state.categories.filter(x=>x.id!==id);
+      render(); toast('已删除');
+    });
+  }
+};
+$('#catList').oninput = e=>{
+  if(e.target.classList.contains('cat-name')){
+    const id=e.target.dataset.id, v=e.target.value.trim();
+    if(!v) return;
+    const old=state.categories.find(x=>x.id===id)?.name;
+    if(old!==v && state.categories.find(x=>x.name===v&&x.id!==id)){ toast('分类名重复'); return; }
+    const c=state.categories.find(x=>x.id===id); c.name=v;
+    if(online&&sb) sb.from('category').update({name:v}).eq('id',id);
+    else{ const s=local(); s.categories=state.categories; localStorage.setItem(LSL,JSON.stringify(s)); }
+    render();
+  }
+  if(e.target.classList.contains('cat-color')){
+    const c=state.categories.find(x=>x.id===e.target.dataset.id); c.color=e.target.value;
+    if(online&&sb) sb.from('category').update({color:e.target.value}).eq('id',c.id);
+    render();
+  }
+};
+
+/* ============ 表单 ============ */
+$('#amortize').onchange = e=>{ $('#monthsBox').classList.toggle('show',e.target.checked); updateHint(); };
+['#months','#date','#amount'].forEach(s=>$(s).oninput=updateHint);
+function updateHint(){
+  const on=$('#amortize').checked, m=+$('#months').value||2, amt=+$('#amount').value||0;
+  const start=new Date($('#date').value||ymd(today));
+  if(on&&m>=2&&amt>0){
+    const end=new Date(start.getFullYear(),start.getMonth()+m-1,1);
+    const per=amt/m;
+    $('#endMonth').value=ym(end);
+    $('#amortHint').innerHTML=`<div class="kv"><span>平摊区间</span><b>${ym(start)} → ${ym(end)}</b></div>
+      <div class="kv"><span>每月计入</span><b>${fmt(per)} × ${m} 个月</b></div>
+      <div class="kv"><span>本月账单只记</span><b style="color:var(--a)">${fmt(per)}</b></div>`;
+  }else{ $('#endMonth').value=''; $('#amortHint').innerHTML=''; }
+}
+$('#fillDemo').onclick=()=>{ $('#amount').value=2400; $('#category').value=state.categories.find(c=>c.name==='物业费')?.id||''; $('#note').value='小区物业费 10-12月'; $('#amortize').checked=true; $('#months').value=3; updateHint(); };
+
+$('#form').onsubmit = async e=>{
+  e.preventDefault();
+  const who = $('input[name="who"]:checked').value;
+  const member = state.members.find(m=>m.name===who) || {id:null};
+  const rec = {
+    ledger_id: cfg.ledgerId||null,
+    paid_by_member_id: member.id,
+    occurred_on: $('#date').value,
+    category_id: $('#category').value,
+    amount: +$('#amount').value,
+    note: $('#note').value.trim(),
+    split: parseFloat($('input[name="split"]:checked').value)||1,
+    months: ($('#amortize').checked && +$('#months').value>=2)? +$('#months').value : 1,
+    who, // 本地兜底用
+  };
+  if(!rec.amount||rec.amount<=0){ toast('请输入有效金额'); return; }
+  const btn=$('#submitBtn'); btn.disabled=true; btn.textContent='保存中…';
+  try{
+    if(online && sb){
+      const saved = await pushEntry(rec);
+      saved._who = who;
+      state.entries.unshift(saved);
+    }else{
+      rec.id='e'+Date.now(); rec.created_at=new Date().toISOString(); rec._who=who;
+      const s=local(); s.entries.unshift(rec); localStorage.setItem(LSL,JSON.stringify(s));
+      state.entries.unshift(rec);
+    }
+    $('#amount').value=''; $('#note').value=''; $('#amortize').checked=false; $('#monthsBox').classList.remove('show'); updateHint();
+    render();
+    toast('已记账 ✅ 扣扣那边马上能看到');
+  }catch(err){ toast('保存失败：'+err); }
+  finally{ btn.disabled=false; btn.textContent='＋ 保存这笔账'; }
+};
+
+/* ============ 筛选与统计 ============ */
+function inRange(dStr,r){
+  const d=new Date(dStr), n=new Date();
+  if(r==='thisMonth') return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth();
+  if(r==='lastMonth'){ const lm=new Date(n.getFullYear(),n.getMonth()-1,1); return d.getFullYear()===lm.getFullYear()&&d.getMonth()===lm.getMonth(); }
+  if(r==='thisQuarter') return d.getFullYear()===n.getFullYear()&&Math.floor(d.getMonth()/3)===Math.floor(n.getMonth()/3);
+  if(r==='thisYear') return d.getFullYear()===n.getFullYear();
+  return true;
+}
+// 把“原始账单”展开成“月度账行”（用于平摊统计）
+function monthlyRows(){
+  const rows=[];
+  state.entries.forEach(r=>{
+    const periods = splitPeriods(r);
+    periods.forEach((p,i)=>{
+      rows.push({
+        id: r.id, period: p.period, amount: p.amount,
+        date: r.occurred_on, who: r._who || (state.members.find(m=>m.id===r.paid_by_member_id)?.name) || '呆头鹅',
+        category: catOf(r.category_id).name, color: catOf(r.category_id).color,
+        note: r.note, split: r.split||1, months: r.months||1, idx: i, total: periods.length,
+        isAmort: r.months>=2
+      });
+    });
+  });
+  return rows;
+}
+function getFiltered(){
+  const range=$('#range').value, who=$('#filterWho').value, cat=$('#filterCat').value,
+        kw=$('#search').value.trim().toLowerCase(), inc=$('#includeAmort').checked;
+  return monthlyRows().filter(r=>{
+    if(!inRange(r.date,range)) return false;
+    if(who!=='all'&&r.who!==who) return false;
+    if(cat!=='all'&& r.category!=='__amort' && state.categories.find(c=>c.id===cat)?.name!==r.category) return false;
+    if(kw && !(r.note||'').toLowerCase().includes(kw) && !r.category.toLowerCase().includes(kw)) return false;
+    if(!inc && r.isAmort && r.idx>0) return false; // 不含平摊时，只保留原始那笔的“首月”
+    if(cat==='__amort' && !r.isAmort) return false;
+    return true;
+  }).sort((a,b)=> b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+}
+
+function render(){
+  const rows = getFiltered();
+  const total = rows.reduce((s,r)=>s+r.amount,0);
+  const shareA = rows.filter(r=>r.who==='呆头鹅').reduce((s,r)=>s+r.amount*(r.split||1),0);
+  const shareB = rows.filter(r=>r.who==='扣扣').reduce((s,r)=>s+r.amount*(r.split||1),0);
+
+  // 本月口径（统计卡片）
+  const mt = monthlyRows().filter(r=>inRange(r.date,'thisMonth')).reduce((s,r)=>s+r.amount,0);
+
+  $('#stats').innerHTML = `
+    <div class="stat"><div class="lbl">📅 本月支出</div><div class="val">${fmt(mt).replace('¥','')}<small>元</small></div></div>
+    <div class="stat"><div class="lbl">🗓️ 当前区间合计</div><div class="val">${fmt(total).replace('¥','')}<small>元</small></div></div>
+    <div class="stat"><div class="lbl"><span class="dot a"></span>呆头鹅应付</div><div class="val" style="color:var(--a)">${fmt(shareA).replace('¥','')}<small>元</small></div></div>
+    <div class="stat"><div class="lbl"><span class="dot b"></span>扣扣应付</div><div class="val" style="color:var(--b)">${fmt(shareB).replace('¥','')}<small>元</small></div></div>`;
+
+  const tb=$('#table tbody');
+  if(!rows.length){ tb.innerHTML=`<tr><td colspan="6" class="empty">还没有账单，快记第一笔吧 🎉</td></tr>`; }
+  else {
+    tb.innerHTML = rows.slice(0,400).map(r=>`
+      <tr>
+        <td>${r.date.slice(5)}</td>
+        <td><span class="who-badge ${r.who==='呆头鹅'?'a':'b'}">${r.who}</span>${r.split&&r.split<1?'<span class="amort-tag">分摊'+(r.split*100|0)+'%</span>':''}</td>
+        <td><span class="cat-pill"><span class="sw" style="background:${r.color}"></span>${r.category}</span></td>
+        <td class="amt">${fmt(r.amount)}</td>
+        <td>${(r.note||'')||'<span style="color:#ccd2dd">—</span>'} ${r.isAmort?'<span class="amort-tag">🔁 平摊 '+(r.idx+1)+'/'+r.total+'</span>':''}</td>
+        <td><button class="del-row" data-id="${r.id}" title="删除">🗑️</button></td>
+      </tr>`).join('');
+  }
+  drawChart(rows);
+}
+
+$('#table tbody').onclick = e=>{
+  const id=e.target.closest('.del-row')?.dataset.id;
+  if(!id) return;
+  const r=state.entries.find(x=>x.id===id); if(!r) return;
+  confirmModal(`删除「${catOf(r.category_id).name}」${fmt(r.amount)}？`,
+    r.months>=2 ? '这是一笔多月平摊账单，删除后后续各月的摊分也会一起消失。' : '删除后无法恢复（云端仍可从其导出备份找回）。',
+    async()=>{
+      if(online&&sb) await deleteEntry(id);
+      else{ const s=local(); s.entries=s.entries.filter(x=>x.id!==id); localStorage.setItem(LSL,JSON.stringify(s)); }
+      state.entries=state.entries.filter(x=>x.id!==id);
+      render(); toast('已删除');
+    });
+};
+$('#clearAll').onclick = ()=> confirmModal('清空全部账单？','包括所有平摊记录，且不可恢复。确定？',async()=>{
+  if(online&&sb){ await sb.from('entry').delete().eq('ledger_id',cfg.ledgerId); }
+  else{ localStorage.setItem(LSL,JSON.stringify({...local(),entries:[]})); }
+  state.entries=[]; render(); toast('已清空');
+});
+$('#refreshBtn').onclick = ()=>{ loadFromCloud(); toast('已刷新'); };
+['#range','#includeAmort','#filterWho','#filterCat'].forEach(s=>$(s).onchange=render);
+$('#search').oninput=render;
+
+/* ============ 图表 ============ */
+function drawChart(rows){
+  const catColor=n=>(state.categories.find(c=>c.name===n)||{color:'#8a94a6'}).color;
+  let labels,data,type;
+  if(chartType==='cat'){
+    const m={}; rows.forEach(r=>m[r.category]=(m[r.category]||0)+r.amount);
+    const a=Object.entries(m).sort((x,y)=>y[1]-x[1]); labels=a.map(x=>x[0]); data=a.map(x=>x[1]); type='doughnut';
+  }else if(chartType==='who'){
+    labels=['呆头鹅','扣扣'];
+    data=[rows.filter(r=>r.who==='呆头鹅').reduce((s,r)=>s+r.amount,0), rows.filter(r=>r.who==='扣扣').reduce((s,r)=>s+r.amount,0)];
+    type='doughnut';
+  }else{
+    const m={}; rows.forEach(r=>{ const k=r.date.slice(0,7); m[k]=(m[k]||0)+r.amount; });
+    labels=Object.keys(m).sort(); data=labels.map(k=>m[k]); type='bar';
+  }
+  if(!labels.length){ labels=['暂无数据']; data=[1]; }
+  if(chart) chart.destroy();
+  chart=new Chart($('#chart'),{
+    type,
+    data:{ labels, datasets:[{ data,
+      backgroundColor: type==='bar'?'#4f6ef7':labels.map((l,i)=>chartType==='who'?['#4f6ef7','#ff8a5c'][i]:catColor(l)),
+      borderWidth:0, borderRadius: type==='bar'?6:0, gap: type==='bar'?6:0 }]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:type==='bar'?false:true, position:'right', labels:{boxWidth:11,boxHeight:11,padding:10,font:{size:12}} },
+        tooltip:{ callbacks:{ label:c=>' '+c.label+': '+fmt(c.parsed||c.parsed.y) } } },
+      scales: type==='bar'?{ y:{ beginAtZero:true, ticks:{callback:v=>v/1000+'k',font:{size:11}}, grid:{color:'#eef1f7'} }, x:{ grid:{display:false} } }:{} }
+  });
+}
+$('#chartTabs').onclick=e=>{
+  if(e.target.tagName==='BUTTON'){ $('#chartTabs .on').classList.remove('on'); e.target.classList.add('on'); chartType=e.target.dataset.t; render(); }
+};
+
+/* ============ 导出 ============ */
+$('#exportBtn').onclick=()=>{
+  const rows=getFiltered();
+  if(!rows.length){ toast('没有可导出的数据'); return; }
+  const wb=XLSX.utils.book_new();
+  const heads=['日期','付款人','类别','计入金额(元)','分摊比例','备注','是否平摊','平摊进度','原始金额(元)'];
+  const data=rows.map(r=>[r.date,r.who,r.category,r.amount,(r.split||1)*100+'%',r.note||'',r.isAmort?'是':'否',r.isAmort?(r.idx+1)+'/'+r.total:'', r.isAmort?(r.amount*r.total).toFixed(2):r.amount]);
+  const ws=XLSX.utils.aoa_to_sheet([heads,...data]);
+  ws.cols=[{wch:12},{wch:10},{wch:12},{wch:13},{wch:10},{wch:28},{wch:9},{wch:10},{wch:13}];
+  XLSX.utils.book_append_sheet(wb,ws,'账单明细');
+  const byCat={}; rows.forEach(r=>byCat[r.category]=(byCat[r.category]||0)+r.amount);
+  const ss=XLSX.utils.aoa_to_sheet([['分类','金额(元)','占比'],
+    ...Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[k,v,(v/total*100).toFixed(1)+'%']),
+    ['合计',total,'100%']]);
+  XLSX.utils.book_append_sheet(wb,ss,'分类汇总');
+  XLSX.writeFile(wb, `家庭账单_${ym(today)}.xlsx`);
+  toast('已导出 Excel 📥');
+};
+$('#backupBtn').onclick=()=>{
+  const blob=new Blob([JSON.stringify({exported_at:new Date().toISOString(), entries:state.entries, categories:state.categories},null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`账本备份_${ym(today)}.json`; a.click();
+  toast('已导出备份 JSON 💾');
+};
+
+/* ============ 实时同步（Realtime + 兜底轮询） ============ */
+function subscribe(){
+  if(!sb || !cfg.ledgerId) return;
+  sb.channel('ledger-'+cfg.ledgerId)
+    .on('postgres_changes',{event:'*',schema:'public',table:'entry',filter:`ledger_id=eq.${cfg.ledgerId}`},(change)=>{
+      handleChange(change);
+    })
+    .subscribe((status)=>{
+      if(status==='SUBSCRIBED'){ setSync('实时同步中'); }
+      else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'){ setSync('重连中…','warn'); }
+    });
+  // 兜底：每 15 秒拉一次，防止 WebSocket 断掉后一直不更新
+  setInterval(()=>{ if(navigator.onLine) loadFromCloud(); }, 15000);
+}
+function handleChange(change){
+  const e = change.new || change.old;
+  if(change.eventType==='INSERT' || change.eventType==='UPDATE'){
+    const i = state.entries.findIndex(x=>x.id===e.id);
+    if(i>=0) state.entries[i] = e; else state.entries.unshift(e);
+  }else if(change.eventType==='DELETE'){
+    state.entries = state.entries.filter(x=>x.id!==e.id);
+  }
+  render();
+  flashSync('🔄 对方刚记了一笔，已同步');
+}
+function flashSync(msg){
+  const el=$('#syncBadge'), txt=$('#syncTxt'); const old=el.className, ot=txt.textContent;
+  el.className='sync'; txt.textContent=msg;
+  setTimeout(()=>{ el.className=old||'sync'; txt.textContent='云端同步中'; }, 2600);
+}
+function setSync(t, level){
+  const el=$('#syncBadge'), txt=$('#syncTxt');
+  el.className='sync'+(level?' '+level:''); txt.textContent=t;
+}
+
+/* ============ 引导设置（小白步骤） ============ */
+const STEPS = [
+  { title:'① 建 Supabase 项目（2 分钟）', html:`
+    <div class="steps">
+      1. 电脑浏览器打开 <b>supabase.com</b>，点右上角 <b>Start your project</b>，用 GitHub / Google / 邮箱注册登录。<br>
+      2. 点 <b>New project</b>，Organization 选默认。<br>
+      3. Project name 随便起，比如 <b>family-billing</b>；密码让系统生成并<mark>抄下来存好</mark>。<br>
+      4. Region 选 <b>Singapore（新加坡）</b>（离我们最近、速度最快）。<br>
+      5. Pricing plan 选 <b>Free</b>。点 Create project，等约 2 分钟。<br>
+      <span style="color:var(--sub)">💡 免费额度：500MB 数据库、不限请求、每月 200 万条实时消息，两人记账用十几年都用不完。</span>
+    </div>`},
+  { title:'② 建数据表（复制粘贴即可）', html:`
+    <div class="steps">
+      1. 左侧菜单点 <b>SQL Editor</b> → <b>New query</b>。<br>
+      2. 把下面的代码<b>全部复制</b>粘贴进去，点 <b>RUN</b>：<span class="code" id="sqlCode">正在加载建表语句…</span>
+      3. 再新建一个查询，粘贴“开启实时同步”那段，点 <b>RUN</b>：<span class="code" id="rtCode">正在加载…</span>
+      <button class="btn-ghost btn-sm" id="copySql">📋 复制建表语句</button>
+      <button class="btn-ghost btn-sm" id="copyRt">📋 复制实时同步语句</button>
+    </div>`},
+  { title:'③ 拿到两个连接值', html:`
+    <div class="steps">
+      1. 左侧 <b>Project Settings</b> → <b>API</b>。<br>
+      2. 复制 <b>Project URL</b>（长得像 <span class="code">https://xxxx.supabase.co</span>），粘贴到本网页「账本设置」的 Project URL 里。<br>
+      3. 复制 <b>anon public</b> 那串 key（很长一串），粘贴到 anon key 里。<br>
+      ⚠️ <b>千万别复制 service_role key</b>，那是管理员密码，不能放进网页。<br>
+      4. 点「保存并连接」。
+    </div>`},
+  { title:'④ 创建你们的家庭账本', html:`
+    <div class="steps">
+      输入账本名字（如「呆头鹅和扣扣的家」），再设一个<b>只有你们俩知道的共享密码</b>（别用 123456，建议 8 位以上混字母数字）。<br>
+      点「创建账本」后，网页会生成一个账本 ID。<br><br>
+      📱 <b>发给扣扣：</b>把这个 <b>网页文件</b> 和 <b>共享密码</b> 通过微信发给对方 → 对方用手机浏览器打开 → 点「账本设置」→ 粘贴同样的 Project URL 和 anon key → 输入账本 ID 和密码 → 就能看到你记的每一笔了。<br>
+      <input type="text" id="setupName" placeholder="账本名称，如：我们的家" style="margin:8px 0">
+      <input type="password" id="setupPad" placeholder="共享密码（两人相同，别告诉别人）" style="margin:8px 0">
+    </div>`}
+];
+let step=0;
+$('#openSetup').onclick=()=>{ step=0; showStep(); $('#setupModal').classList.add('show'); };
+$('#cancelSetup').onclick=()=> $('#setupModal').classList.remove('show');
+$('#prevStep').onclick=()=>{ if(step>0) step--; showStep(); };
+$('#nextStep').onclick=()=>{
+  if(step===STEPS.length-1){ doCreateLedger(); return; }
+  if(step===2){ doConnect(); return; }
+  step++; showStep();
+};
+function showStep(){
+  const s=STEPS[step];
+  $('#setupStep').innerHTML = `<h2 style="font-size:15px;margin-bottom:10px">${s.title}</h2>${s.html}`;
+  $('#prevStep').style.display = step>0?'inline-block':'none';
+  $('#nextStep').textContent = (step===STEPS.length-1)?'创建账本':'下一步 →';
+  if(step===1){
+    const sql=`create table if not exists ledger(id uuid primary key default gen_random_uuid(), pad_hash text not null, name text not null default '我们的家庭账本', created_at timestamptz not null default now());
+create table if not exists member(id uuid primary key default gen_random_uuid(), ledger_id uuid not null references ledger(id) on delete cascade, name text not null, color text, is_active boolean not null default true, created_at timestamptz not null default now());
+create table if not exists category(id uuid primary key default gen_random_uuid(), ledger_id uuid references ledger(id) on delete cascade, name text not null, icon text, type text not null check (type in ('expense','income')), sort int not null default 0, is_active boolean not null default true);
+create table if not exists entry(id uuid primary key default gen_random_uuid(), ledger_id uuid not null references ledger(id) on delete cascade, paid_by_member_id uuid references member(id) on delete set null, occurred_on date not null, category_id uuid references category(id) on delete set null, amount numeric(12,2) not null check (amount>0), note text, source_entry_id uuid references entry(id) on delete set null, created_at timestamptz not null default now());
+create table if not exists entry_split(id uuid primary key default gen_random_uuid(), entry_id uuid not null references entry(id) on delete cascade, member_id uuid references member(id) on delete set null, period text not null check (period~'^\\d{4}-\\d{2}$'), allocated_amount numeric(12,2) not null, unique(entry_id,member_id,period));
+alter publication supabase_realtime add table entry; alter publication supabase_realtime add table entry_split; alter publication supabase_realtime add table category; alter publication supabase_realtime add table member;
+create extension if not exists pgcrypto;
+create or replace function open_ledger(pad_hash text, ledger_id uuid) returns void language plpgsql security definer as $$ begin perform set_config('app.pad_hash', pad_hash, true); perform set_config('app.ledger_id', ledger_id::text, true); end; $$;
+alter table ledger enable row level security; alter table member enable row level security; alter table category enable row level security; alter table entry enable row level security; alter table entry_split enable row level security;
+grant usage on schema public to anon; grant select,insert,update,delete on ledger,member,category,entry,entry_split to anon;
+create policy "p" on ledger for all to anon using (pad_hash = current_setting('app.pad_hash',true)) with check (pad_hash = current_setting('app.pad_hash',true));
+create policy "m" on member for all to anon using (ledger_id in (select id from ledger where pad_hash=current_setting('app.pad_hash',true))) with check (ledger_id in (select id from ledger where pad_hash=current_setting('app.pad_hash',true)));
+create policy "c" on category for all to anon using (ledger_id in (select id from ledger where pad_hash=current_setting('app.pad_hash',true))) with check (ledger_id in (select id from ledger where pad_hash=current_setting('app.pad_hash',true)));
+create policy "e" on entry for all to anon using (ledger_id in (select id from ledger where pad_hash=current_setting('app.pad_hash',true))) with check (ledger_id in (select id from ledger where pad_hash=current_setting('app.pad_hash',true)));
+create policy "s" on entry_split for all to anon using (entry_id in (select id from entry where ledger_id in (select id from ledger where pad_hash=current_setting('app.pad_hash',true)))) with check (entry_id in (select id from entry where ledger_id in (select id from ledger where pad_hash=current_setting('app.pad_hash',true))));`;
+    const rt=`-- 如果上面已经包含下面这句，可跳过
+alter publication supabase_realtime add table entry;
+alter publication supabase_realtime add table entry_split;`;
+    $('#sqlCode').textContent=sql; $('#rtCode').textContent=rt;
+    $('#copySql').onclick=()=>{ navigator.clipboard.writeText(sql); toast('已复制建表语句'); };
+    $('#copyRt').onclick=()=>{ navigator.clipboard.writeText(rt); toast('已复制'); };
+  }
+}
+async function doConnect(){
+  saveCfg();
+  if(!SUPABASE_URL||!SUPABASE_ANON_KEY){ confirmModal('还没填连接信息','请先在文件顶部把 Project URL 和 anon key 填好（用记事本/文本编辑器打开本 html 文件，最顶上就能看到）。需要我出图文教程吗？',()=>{}); return; }
+  setSync('连接中…','warn');
+  await loadFromCloud();
+  if(online){ toast('连接成功 ✅'); }
+  else { toast('连接失败，检查 URL 和 key'); }
+}
+async function doCreateLedger(){
+  const name=($('#setupName').value||'我们的家庭账本').trim();
+  const pad=($('#setupPad').value||'').trim();
+  if(pad.length<6){ toast('共享密码至少 6 位'); return; }
+  if(!SUPABASE_URL||!SUPABASE_ANON_KEY){ toast('请先填好 Project URL 和 anon key'); return; }
+  const c=ensureClient();
+  const { data, error } = await c.from('ledger').insert({ name, pad_hash: await sha256(pad) }).select();
+  if(error){ toast('创建失败：'+error.message); return; }
+  cfg.ledgerId=data[0].id; cfg.pad=pad; saveCfg();
+  // 初始化成员与分类
+  await c.from('member').insert([{ledger_id:cfg.ledgerId,name:'呆头鹅',color:'#4f6ef7'},{ledger_id:cfg.ledgerId,name:'扣扣',color:'#ff8a5c'}]);
+  await c.from('category').insert(defaultCategories().map(cat=>({ledger_id:cfg.ledgerId,name:cat.name,icon:'🏷️',type:'expense',color:cat.color})));
+  await loadFromCloud();
+  subscribe();
+  $('#setupModal').classList.remove('show');
+  $('#banner').style.display='none';
+  toast('账本创建成功 🎉 快去告诉扣扣一起用');
+}
+function saveCfg(){ localStorage.setItem(LS, JSON.stringify(cfg)); }
+
+/* ============ 弹窗 & 提示 ============ */
+function confirmModal(title,text,fn){
+  $('#modalTitle').textContent=title; $('#modalText').textContent=text;
+  $('#modal').classList.add('show');
+  const ok=$('#modalOk'),cancel=$('#modalCancel');
+  const clean=()=>{$('#modal').classList.remove('show');ok.onclick=null;cancel.onclick=null;};
+  ok.onclick=()=>{fn();clean();}; cancel.onclick=clean;
+}
+let toastTimer;
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2400); }
+
+/* ============ 启动 ============ */
+function bootstrap(){
+  if(SUPABASE_URL && SUPABASE_ANON_KEY && cfg.ledgerId && cfg.pad){
+    ensureClient();
+    loadFromCloud().then(()=>{ subscribe(); $('#banner').style.display='none'; });
+  }else{
+    // 本地兜底模式
+    const s=local();
+    state.categories = s.categories.length?s.categories:defaultCategories();
+    state.entries = s.entries||[];
+    state.members = s.members.length?s.members:[{id:'m1',name:'呆头鹅',color:'#4f6ef7'},{id:'m2',name:'扣扣',color:'#ff8a5c'}];
+    setSync('仅本机（未配置云端）','warn');
+    // 示例
+    if(!state.entries.length){
+      const demo=[['车位费',1200,'呆头鹅','地下车位 10-11月',2],['小孩学费',8000,'扣扣','秋季学费，平摊至12月',4],['餐饮',520,'呆头鹅','午饭+超市',1],['水电燃气',386,'扣扣','',1],['娱乐休闲',299,'呆头鹅','电影',1]];
+      demo.forEach(([cn,a,w,n,m],i)=>{
+        const d=new Date(today); d.setDate(today.getDate()-i*2);
+        const cat=state.categories.find(c=>c.name===cn)||state.categories[0];
+        state.entries.push({id:'d'+i,ledger_id:null,occurred_on:ymd(d),category_id:cat.id,amount:a,note:n,split:1,months:m,who:w,created_at:new Date().toISOString()});
+      });
+      localStorage.setItem(LSL,JSON.stringify({categories:state.categories,entries:state.entries,members:state.members}));
+    }
+    render();
+  }
+  refreshCatUI();
+}
+bootstrap();
+</script>
+</body>
+</html>
